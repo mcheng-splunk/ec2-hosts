@@ -9,7 +9,6 @@ on:
       - 'roles/**'
       - '*.yml'
 
-  # Adds the dual-dropdown selector layout inside Gitea's UI
   workflow_dispatch:
     inputs:
       target_env:
@@ -33,23 +32,23 @@ on:
 
 jobs:
   deploy:
+    # Tell act_runner to execute directly inside the host pod shell, avoiding nested container image bugs
     runs-on: ubuntu-latest
+    labels: host
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install System Dependencies
-        # Detects the OS environment dynamically to prevent package manager command failures
+        # Runs safely directly in the host runner profile
         run: |
           if command -v apk &> /dev/null; then
-            echo "Alpine environment detected. Installing via apk..."
             apk add --no-cache git python3 py3-pip openssh-client ansible
           elif command -v apt-get &> /dev/null; then
-            echo "Ubuntu/Debian environment detected. Installing via apt..."
             sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
           else
-            echo "Unknown environment. Attempting fallback pip installation..."
+            echo "Fallback to pip context..."
             pip3 install ansible
           fi
 
@@ -65,7 +64,6 @@ jobs:
       - name: Parse Environment and Playbook Selections
         id: parse-matrix
         run: |
-          # 1. Evaluate Environment Path Selection (Default to dev for raw git pushes)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ENV_CHOICE="${{ github.event.inputs.target_env }}"
             TIER_CHOICE="${{ github.event.inputs.target_tier }}"
@@ -75,7 +73,6 @@ jobs:
             echo "Automated git push hook triggered. Defaulting to DEV environment deployment."
           fi
 
-          # 2. Determine final Playbook configuration string mapping
           if [ "$TIER_CHOICE" = "db_machines" ]; then
             PLAYBOOK_FILE="db_machines.yml"
           elif [ "$TIER_CHOICE" = "webservers" ]; then
@@ -84,14 +81,9 @@ jobs:
             PLAYBOOK_FILE="site.yml"
           fi
 
-          # 3. Export strings back out to the workflow environment block
           echo "inventory_path=inventories/$ENV_CHOICE/" >> $GITHUB_OUTPUT
           echo "playbook_file=$PLAYBOOK_FILE" >> $GITHUB_OUTPUT
-          
-          echo "LOG: Targeting Environment -> inventories/$ENV_CHOICE/"
-          echo "LOG: Target Execution Playbook -> $PLAYBOOK_FILE"
 
       - name: Execute Targeted Ansible GitOps Playbook
-        # Both properties are now completely decoupled from hardcoded string paths
         run: |
           ansible-playbook -i ${{ steps.parse-matrix.outputs.inventory_path }} ${{ steps.parse-matrix.outputs.playbook_file }} --vault-password-file .vault_pass.txt
