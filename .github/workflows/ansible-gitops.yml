@@ -21,7 +21,7 @@ on:
       target_tier:
         description: 'Select Infrastructure Tier to Deploy'
         required: true
-        default: 'ALL'
+        default: 'db_machines'
         type: choice
         options:
           - db_machines
@@ -49,7 +49,7 @@ jobs:
           # Change 'id_rsa' to 'aws-id-rsa.pem' to match what your Ansible variables expect
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/aws-id-rsa.pem
           chmod 600 ~/.ssh/aws-id-rsa.pem
-          
+
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass.txt
           chmod 600 .vault_pass.txt
         # echo "host_key_checking = False" >> ansible.cfg
