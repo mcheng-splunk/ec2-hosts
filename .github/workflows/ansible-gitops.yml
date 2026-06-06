@@ -32,25 +32,17 @@ on:
 
 jobs:
   deploy:
-    # Tell act_runner to execute directly inside the host pod shell, avoiding nested container image bugs
-    runs-on: ubuntu-latest
-    labels: host
+    # Crucial change: target self-hosted to run natively in the runner pod's shell env
+    runs-on: self-hosted
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install System Dependencies
-        # Runs safely directly in the host runner profile
+        # Since the runner image is a Debian-based image (node:16-bullseye), we use apt
         run: |
-          if command -v apk &> /dev/null; then
-            apk add --no-cache git python3 py3-pip openssh-client ansible
-          elif command -v apt-get &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
-          else
-            echo "Fallback to pip context..."
-            pip3 install ansible
-          fi
+          sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
 
       - name: Configure SSH & Vault Keys
         run: |
