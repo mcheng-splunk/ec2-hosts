@@ -46,8 +46,10 @@ jobs:
       - name: Configure SSH & Vault Keys
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          # Change 'id_rsa' to 'aws-id-rsa.pem' to match what your Ansible variables expect
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/aws-id-rsa.pem
+          chmod 600 ~/.ssh/aws-id-rsa.pem
+          
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass.txt
           chmod 600 .vault_pass.txt
         # echo "host_key_checking = False" >> ansible.cfg
