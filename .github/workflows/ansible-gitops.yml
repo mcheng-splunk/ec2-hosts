@@ -1,3 +1,32 @@
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'inventories/**'
+      - 'roles/**'
+      - '*.yml'
+
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Select Target Environment Scope'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+      target_tier:
+        description: 'Select Infrastructure Tier to Deploy'
+        required: true
+        default: 'ALL'
+        type: choice
+        options:
+          - db_machines
+          - webservers
+          - ALL
 # ... (Keep your top 'name:' and 'on:' blocks exactly the same) ...
 
 jobs:
