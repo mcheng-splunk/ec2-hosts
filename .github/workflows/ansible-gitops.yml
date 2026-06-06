@@ -29,7 +29,9 @@ on:
           - webservers
           - ALL
 # ... (Keep your top 'name:' and 'on:' blocks exactly the same) ...
-
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  
 jobs:
   deploy:
     # This exact array block overrides the engine, matching ubuntu-latest 
