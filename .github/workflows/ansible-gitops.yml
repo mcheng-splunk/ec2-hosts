@@ -6,6 +6,7 @@ on:
       - 'inventories/**'
       - 'roles/**'
       - '*.yml'
+      - '.github/workflows/*.yml'
 
   workflow_dispatch:
     inputs:
