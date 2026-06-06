@@ -39,9 +39,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install System Dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
+      # - name: Install System Dependencies
+      #   run: |
+      #     sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
 
       - name: Configure SSH & Vault Keys
         run: |
@@ -50,7 +50,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass.txt
           chmod 600 .vault_pass.txt
-          echo "host_key_checking = False" >> ansible.cfg
+        # echo "host_key_checking = False" >> ansible.cfg
 
       - name: Parse Environment and Playbook Selections
         id: parse-matrix
@@ -78,3 +78,7 @@ jobs:
       - name: Execute Targeted Ansible GitOps Playbook
         run: |
           ansible-playbook -i ${{ steps.parse-matrix.outputs.inventory_path }} ${{ steps.parse-matrix.outputs.playbook_file }} --vault-password-file .vault_pass.txt
+        env:
+          # This tells Ansible to skip host key checking globally during this execution step,
+          # completely bypassing the need to touch or modify your ansible.cfg file.
+          ANSIBLE_HOST_KEY_CHECKING: "False"
