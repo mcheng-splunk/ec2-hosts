@@ -1,48 +1,16 @@
-name: Ansible Manual & Automated GitOps
-
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'inventories/**'
-      - 'roles/**'
-      - '*.yml'
-
-  workflow_dispatch:
-    inputs:
-      target_env:
-        description: 'Select Target Environment Scope'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - test
-          - prod
-      target_tier:
-        description: 'Select Infrastructure Tier to Deploy'
-        required: true
-        default: 'ALL'
-        type: choice
-        options:
-          - db_machines
-          - webservers
-          - ALL
+# ... (Keep your top 'name:' and 'on:' blocks exactly the same) ...
 
 jobs:
   deploy:
-    # 1. We match the default label your runner is already listening for
-    runs-on: ubuntu-latest
-    # 2. We explicitly instruct act_runner to execute directly inside the host pod shell
-    labels: host
+    # This exact array block overrides the engine, matching ubuntu-latest 
+    # but executing directly on the runner pod's shell.
+    runs-on: [ubuntu-latest, host]
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install System Dependencies
-        # Since the chart's runner image is a Debian-based image (node:16-bullseye), we use apt
         run: |
           sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
 
