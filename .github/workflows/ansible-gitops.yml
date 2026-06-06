@@ -34,15 +34,24 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    container:
-      image: alpine:latest
 
     steps:
-      - name: Install System Dependencies
-        run: apk add --no-cache git python3 py3-pip openssh-client ansible
-
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Install System Dependencies
+        # Detects the OS environment dynamically to prevent package manager command failures
+        run: |
+          if command -v apk &> /dev/null; then
+            echo "Alpine environment detected. Installing via apk..."
+            apk add --no-cache git python3 py3-pip openssh-client ansible
+          elif command -v apt-get &> /dev/null; then
+            echo "Ubuntu/Debian environment detected. Installing via apt..."
+            sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
+          else
+            echo "Unknown environment. Attempting fallback pip installation..."
+            pip3 install ansible
+          fi
 
       - name: Configure SSH & Vault Keys
         run: |
