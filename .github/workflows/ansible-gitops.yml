@@ -33,7 +33,7 @@ jobs:
   deploy:
     # This exact array block overrides the engine, matching ubuntu-latest 
     # but executing directly on the runner pod's shell.
-    runs-on: [ubuntu-latest, host]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
