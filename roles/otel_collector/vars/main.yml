@@ -1,0 +1,10 @@
+---
+# OpenTelemetry Core Version Variables
+otel_version: "0.152.0"
+otel_arch: "amd64"
+
+otel_config_dir: "/etc/otelcol-contrib"
+otel_config_file: "config.yaml"
+
+# Corrected Contrib distribution URL matching GitHub asset specifications
+otel_download_url: "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{{ otel_version }}/otelcol-contrib_{{ otel_version }}_linux_{{ otel_arch }}.{{ otel_pkg_type }}"
