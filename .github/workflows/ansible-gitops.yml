@@ -31,7 +31,7 @@ on:
 # ... (Keep your top 'name:' and 'on:' blocks exactly the same) ...
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  
+
 jobs:
   deploy:
     # This exact array block overrides the engine, matching ubuntu-latest 
@@ -65,7 +65,7 @@ jobs:
             TIER_CHOICE="${{ github.event.inputs.target_tier }}"
           else
             ENV_CHOICE="dev"
-            TIER_CHOICE="ALL"
+            TIER_CHOICE="db_machines"
             echo "Automated git push hook triggered. Defaulting to DEV environment deployment."
           fi
 
