@@ -32,15 +32,17 @@ on:
 
 jobs:
   deploy:
-    # Crucial change: target self-hosted to run natively in the runner pod's shell env
-    runs-on: self-hosted
+    # 1. We match the default label your runner is already listening for
+    runs-on: ubuntu-latest
+    # 2. We explicitly instruct act_runner to execute directly inside the host pod shell
+    labels: host
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install System Dependencies
-        # Since the runner image is a Debian-based image (node:16-bullseye), we use apt
+        # Since the chart's runner image is a Debian-based image (node:16-bullseye), we use apt
         run: |
           sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
 
