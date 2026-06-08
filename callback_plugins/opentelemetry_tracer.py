@@ -1,19 +1,29 @@
 # callback_plugins/opentelemetry_tracer.py
 # Ansible callback plugin that emits OpenTelemetry spans for playbook execution
 # When OTEL_EXPORTER_OTLP_ENDPOINT is not set, spans are printed to console (debug mode)
+# Gracefully degrades if opentelemetry module is not available
 
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-from ansible.plugins.callback import CallbackBase
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter
-from opentelemetry.trace.status import Status, StatusCode
 import os
+
+from ansible.plugins.callback import CallbackBase
+
+# Try to import opentelemetry, gracefully degrade if not available
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+    from opentelemetry.trace.status import Status, StatusCode
+    OTEL_AVAILABLE = True
+except ImportError as e:
+    OTEL_AVAILABLE = False
+    print("[opentelemetry_tracer] opentelemetry module not available, skipping tracing: {}".format(e))
+    print("[opentelemetry_tracer] Install with: pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc")
 
 
 class CallbackModule(CallbackBase):
@@ -23,6 +33,9 @@ class CallbackModule(CallbackBase):
 
     def __init__(self):
         super().__init__()
+        if not OTEL_AVAILABLE:
+            return
+
         endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
 
         if endpoint:
@@ -45,6 +58,8 @@ class CallbackModule(CallbackBase):
         self._current_role = None
 
     def v2_playbook_on_start(self, playbook):
+        if not OTEL_AVAILABLE:
+            return
         self.root_span = self.tracer.start_span(
             name=f"playbook: {os.path.basename(playbook._file_name)}",
             attributes={
@@ -54,6 +69,8 @@ class CallbackModule(CallbackBase):
         )
 
     def v2_playbook_on_play_start(self, play):
+        if not OTEL_AVAILABLE or self.current_play_span is None:
+            return
         if self.current_play_span:
             self.current_play_span.end()
         play_name = play.get_name().strip()
@@ -70,10 +87,14 @@ class CallbackModule(CallbackBase):
         self.current_play_span = span
 
     def v2_playbook_on_task_start(self, task, is_conditional):
+        if not OTEL_AVAILABLE:
+            return
         role = getattr(task, "_role", None)
         self._current_role = role.get_name() if role else None
 
     def v2_runner_on_start(self, host, task):
+        if not OTEL_AVAILABLE:
+            return
         play = getattr(getattr(task, "_parent", None), "_play", None)
         parent_span = self.play_spans.get(play._uuid, self.root_span) if play else self.root_span
         ctx = trace.set_span_in_context(parent_span)
@@ -100,6 +121,8 @@ class CallbackModule(CallbackBase):
         return self.task_spans.pop((host_name, task_uuid), None)
 
     def v2_runner_on_ok(self, result, **kwargs):
+        if not OTEL_AVAILABLE:
+            return
         span = self._pop_task_span(result)
         if span:
             span.set_attribute("ansible.task.changed", result._result.get("changed", False))
@@ -107,6 +130,8 @@ class CallbackModule(CallbackBase):
             span.end()
 
     def v2_runner_on_failed(self, result, ignore_errors=False, **kwargs):
+        if not OTEL_AVAILABLE:
+            return
         span = self._pop_task_span(result)
         if span:
             error_msg = result._result.get("msg", "Unknown error")
@@ -116,12 +141,16 @@ class CallbackModule(CallbackBase):
             span.end()
 
     def v2_runner_on_skipped(self, result, **kwargs):
+        if not OTEL_AVAILABLE:
+            return
         span = self._pop_task_span(result)
         if span:
             span.set_attribute("ansible.task.skipped", True)
             span.end()
 
     def v2_runner_on_unreachable(self, result, **kwargs):
+        if not OTEL_AVAILABLE:
+            return
         span = self._pop_task_span(result)
         if span:
             error_msg = result._result.get("msg", "Host unreachable")
@@ -131,6 +160,8 @@ class CallbackModule(CallbackBase):
             span.end()
 
     def v2_playbook_on_stats(self, stats):
+        if not OTEL_AVAILABLE:
+            return
         for span in self.task_spans.values():
             span.end()
         if self.current_play_span:
