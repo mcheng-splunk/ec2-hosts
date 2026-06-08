@@ -11,7 +11,11 @@ ec2-hosts/
 ├── site.yml                  # Main entry point (imports all playbooks)
 ├── webservers.yml           # Playbook for webserver tier
 ├── db_machines.yml          # Playbook for database tier
-├── ansible.cfg              # Ansible configuration
+├── teardown.yml             # Playbook to remove OpenTelemetry Collector
+├── test-otel-trace.yml      # Test playbook with OTel tracing enabled
+├── ansible.cfg              # Ansible configuration (includes OTel callback plugin)
+├── callback_plugins/        # Custom Ansible callback plugins
+│   └── opentelemetry_tracer.py
 ├── .github/
 │   └── workflows/           # CI/CD GitHub Actions workflows
 │       └── ansible-gitops.yml
@@ -33,6 +37,46 @@ ec2-hosts/
         ├── vars/main.yml        # Default variables
         └── templates/
             └── config.yaml.j2   # OTel config template
+```
+
+### OpenTelemetry Instrumentation
+
+The project includes an Ansible callback plugin (`callback_plugins/opentelemetry_tracer.py`) that automatically captures OpenTelemetry traces for all playbook executions:
+
+**What gets traced:**
+- Playbook start/end (root span)
+- Each play start/end
+- Each task execution per host (ok, failed, skipped, unreachable)
+- Playbook statistics (success/failure counts per host)
+
+**To enable tracing:**
+1. Install dependencies: `pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc`
+2. Set `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable (e.g., `http://localhost:4317`)
+3. Run any playbook normally - the callback plugin is enabled in `ansible.cfg`
+
+See [oneuptime.com](https://oneuptime.com/blog/post/2026-02-06-instrument-ansible-playbook-opentelemetry/) for more details on the callback plugin implementation.
+
+### Testing with OpenTelemetry Tracing
+
+The `test-otel-localhost.yml` playbook tests the OTel callback plugin by running tasks on localhost:
+
+```bash
+# Run with debug mode (spans printed to console)
+unset OTEL_EXPORTER_OTLP_ENDPOINT
+ansible-playbook -i inventories/dev/ test-otel-localhost.yml
+
+# Run with OTel endpoint (spans exported to collector)
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
+ansible-playbook -i inventories/dev/ test-otel-localhost.yml
+
+# Target specific hosts using --limit
+ansible-playbook -i inventories/dev/ test-otel-localhost.yml --limit db_machines
+ansible-playbook -i inventories/dev/ test-otel-localhost.yml --limit "18.143.144.122"
+```
+
+To test against real EC2 hosts (requires vault):
+```bash
+ansible-playbook -i inventories/dev/ test-otel-localhost.yml --limit db_machines --ask-vault-pass
 ```
 
 ### Host Tiers
@@ -116,6 +160,7 @@ The `otel_collector` role contains:
 2. **Vault Setup (for database secrets):**
    - Create `.vault_pass.txt` with the Vault decryption password
    - Ensure `vault_db_password` is set in `group_vars/db_machines/vault.yaml`
+   - **Note:** When running from CLI, use `--ask-vault-pass` to enter the password interactively. When running from CI/CD (GitHub Actions), use `--vault-password-file` with the secret stored in repository secrets.
 
 3. **OpenTelemetry Package:**
    - Supported: RPM (RHEL/Amazon Linux) or DEB (Debian/Ubuntu)
@@ -125,58 +170,86 @@ The `otel_collector` role contains:
 
 ```bash
 # Using site.yml (deploys both tiers)
-ansible-playbook -i inventories/dev/ site.yml --vault-password-file .vault_pass.txt
+# If running from CLI: use --ask-vault-pass
+# If running from CI/CD: use --vault-password-file with the secret stored there
+ansible-playbook -i inventories/dev/ site.yml --ask-vault-pass
 
 # Or run individually
-ansible-playbook -i inventories/dev/ webservers.yml --vault-password-file .vault_pass.txt
-ansible-playbook -i inventories/dev/ db_machines.yml --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/dev/ webservers.yml --ask-vault-pass
+ansible-playbook -i inventories/dev/ db_machines.yml --ask-vault-pass
 ```
 
 ### Deploy Only to Webservers
 
 ```bash
 # For dev environment
-ansible-playbook -i inventories/dev/ webservers.yml --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/dev/ webservers.yml --ask-vault-pass
 
 # For test environment
-ansible-playbook -i inventories/test/ webservers.yml --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/test/ webservers.yml --ask-vault-pass
 ```
 
 ### Deploy Only to DB Servers
 
 ```bash
 # Deploy to all dbservers in dev (all DB types supported)
-ansible-playbook -i inventories/dev/ db_machines.yml --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/dev/ db_machines.yml --ask-vault-pass
 
 # Deploy to specific DB server (using --limit)
-ansible-playbook -i inventories/test/ db_machines.yml --limit test-db-01 --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/test/ db_machines.yml --limit test-db-01 --ask-vault-pass
 ```
 
 ### Deploy to Different Environments
 
 ```bash
 # Test environment
-ansible-playbook -i inventories/test/ site.yml --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/test/ site.yml --ask-vault-pass
 
 # Production environment (requires prod/ inventory directory)
-ansible-playbook -i inventories/prod/ site.yml --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/prod/ site.yml --ask-vault-pass
 ```
 
 ### Dry Run (Check Mode)
 
 ```bash
 # Preview changes without applying
-ansible-playbook -i inventories/dev/ site.yml --check --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/dev/ site.yml --check --ask-vault-pass
 ```
+
+### Destroy/Teardown OpenTelemetry Collector
+
+```bash
+# Remove OTel collector from all hosts in dev
+ansible-playbook -i inventories/dev/ teardown.yml --ask-vault-pass
+
+# Remove from specific tier
+ansible-playbook -i inventories/dev/ teardown.yml --limit webservers --ask-vault-pass
+ansible-playbook -i inventories/dev/ teardown.yml --limit db_machines --ask-vault-pass
+
+# Remove from specific host (by name)
+ansible-playbook -i inventories/dev/ teardown.yml --limit test-db-01 --ask-vault-pass
+
+# Remove from specific host (by IP)
+ansible-playbook -i inventories/dev/ teardown.yml --limit "18.143.144.122" --ask-vault-pass
+
+# Check mode - see what would be removed
+ansible-playbook -i inventories/dev/ teardown.yml --check --ask-vault-pass
+```
+
+The teardown playbook will:
+1. Stop and disable the `otelcol-contrib` service
+2. Remove the OpenTelemetry package (apt/dnf)
+3. Delete the configuration directory (`/etc/otelcol-contrib`)
+4. Clean up temporary download files in `/tmp`
 
 ### Deploy with Verbose Output
 
 ```bash
 # Verbose logging
-ansible-playbook -i inventories/dev/ site.yml -v --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/dev/ site.yml -v --ask-vault-pass
 
 # Very verbose (debug)
-ansible-playbook -i inventories/dev/ site.yml -vvvv --vault-password-file .vault_pass.txt
+ansible-playbook -i inventories/dev/ site.yml -vvvv --ask-vault-pass
 ```
 
 ## Variable Reference
@@ -296,8 +369,18 @@ Add these to your GitHub repository settings:
 
 ```bash
 # Check if OTel collector is running
-ansible -i inventories/dev/ db_machines -m service -a "name=otelcol-contrib state=started"
+ansible -i inventories/dev/ db_machines -m service -a "name=otelcol-contrib state=started" --ask-vault-pass
 
 # View logs from all hosts
-ansible -i inventories/dev/ all -m shell -a "sudo journalctl -u otelcol-contrib -n 20"
+ansible -i inventories/dev/ all -m shell -a "sudo journalctl -u otelcol-contrib -n 20" --ask-vault-pass
+```
+
+### Verifying Teardown
+
+```bash
+# Check if OTel collector is stopped
+ansible -i inventories/dev/ db_machines -m service -a "name=otelcol-contrib state=stopped" --ask-vault-pass
+
+# Verify package is removed
+ansible -i inventories/dev/ all -m shell -a "dpkg -l | grep otelcol-contrib || rpm -qa | grep otelcol-contrib" --ask-vault-pass
 ```

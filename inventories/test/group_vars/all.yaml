@@ -1,2 +1,7 @@
 ---
-env_stage: "dev"
+env_stage: "test"
+
+# Only used when activating teardown.ym with -limit option
+# ansible-playbook -i inventories/dev/ teardown.yml --limit db_machines --ask-vault-pass
+otel_version: "0.152.0"
+otel_config_dir: "/etc/otelcol-contrib"
