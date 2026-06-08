@@ -42,9 +42,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v6
 
-      # - name: Install System Dependencies
-      #   run: |
-      #     sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y git python3 python3-pip openssh-client ansible
+
+      - name: Install OpenTelemetry Python Packages
+        run: |
+          pip3 install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
 
       - name: Configure SSH & Vault Keys
         run: |
@@ -55,7 +59,6 @@ jobs:
 
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass.txt
           chmod 600 .vault_pass.txt
-        # echo "host_key_checking = False" >> ansible.cfg
 
       - name: Parse Environment and Playbook Selections
         id: parse-matrix
