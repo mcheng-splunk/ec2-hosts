@@ -48,17 +48,15 @@ jobs:
 
       - name: Install OpenTelemetry Python Packages
         run: |
-          # Install OTel packages system-wide (breaking system packages is okay for CI)
-          sudo python3 -m pip install --break-system-packages --upgrade opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
-          # Verify the module can be imported by the same Python
+          # Install OTel packages to system Python with ignore-installed to skip conflicts
+          sudo python3 -m pip install --ignore-installed --upgrade opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
+          # Verify
           python3 -c "from opentelemetry import trace; print('OTel module loaded successfully')"
 
       - name: Debug Python Environment
         run: |
           echo "=== Python and OTel Debug ==="
           echo "Python: $(python3 --version)"
-          echo "Python exec: $(which python3)"
-          python3 -c "import sys; print('Python path:', sys.executable)"
           python3 -c "from opentelemetry import trace; print('OTel import successful!')"
 
       - name: Configure SSH & Vault Keys
