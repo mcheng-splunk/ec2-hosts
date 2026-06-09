@@ -48,7 +48,20 @@ jobs:
 
       - name: Install OpenTelemetry Python Packages
         run: |
-          pip3 install --ignore-installed opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
+          # Install OTel packages for the system Python
+          python3 -m pip install --ignore-installed opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
+          # Verify installation
+          python3 -c "from opentelemetry import trace; print('OTel module loaded successfully')"
+
+      - name: Debug Python Environment
+        run: |
+          echo "=== Python Info ==="
+          python3 --version
+          which python3
+          echo "=== Ansible Python ==="
+          ansible-playbook --version | head -3
+          echo "=== OTel Test ==="
+          python3 -c "from opentelemetry import trace; print('OTel import OK')"
 
       - name: Configure SSH & Vault Keys
         run: |
