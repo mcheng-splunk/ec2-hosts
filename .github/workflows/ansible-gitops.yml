@@ -50,14 +50,30 @@ jobs:
         run: |
           # Install OTel packages to system Python with ignore-installed to skip conflicts
           sudo python3 -m pip install --ignore-installed --upgrade opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
-          # Verify
-          python3 -c "from opentelemetry import trace; print('OTel module loaded successfully')"
+          # Verify in system Python
+          python3 -c "from opentelemetry import trace; print('OTel module loaded successfully in system Python')"
 
       - name: Debug Python Environment
         run: |
-          echo "=== Python and OTel Debug ==="
+          echo "=== Python Debug ==="
           echo "Python: $(python3 --version)"
-          python3 -c "from opentelemetry import trace; print('OTel import successful!')"
+          echo "Python executable: $(which python3)"
+
+          echo ""
+          echo "=== Ansible Debug ==="
+          which ansible-playbook
+          ansible-playbook --version
+
+          echo ""
+          echo "=== Test OTel in system Python ==="
+          python3 -c "from opentelemetry import trace; print('OTel import in python3 OK')"
+
+          echo ""
+          echo "=== Test OTel in Ansible Python (IMPORTANT) ==="
+          ANSIBLE_PYTHON=$(ansible-playbook --version | grep -i python | awk '{print $NF}' | tr -d '()')
+          echo "Detected Ansible Python: $ANSIBLE_PYTHON"
+
+          $ANSIBLE_PYTHON -c "from opentelemetry import trace; print('OTel import in Ansible Python OK')"
 
       - name: Configure SSH & Vault Keys
         run: |
