@@ -48,8 +48,8 @@ jobs:
 
       - name: Install OpenTelemetry Python Packages
         run: |
-          # Install OTel packages to the system Python's site-packages
-          python3 -m pip install --ignore-installed --upgrade opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
+          # Install OTel packages system-wide
+          sudo python3 -m pip install --upgrade opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
           # Verify the module can be imported by the same Python
           python3 -c "from opentelemetry import trace; print('OTel module loaded successfully')"
 
@@ -59,7 +59,6 @@ jobs:
           echo "Python: $(python3 --version)"
           echo "Python exec: $(which python3)"
           python3 -c "import sys; print('Python path:', sys.executable)"
-          python3 -c "import opentelemetry; print('OTel version:', opentelemetry.__version__)"
           python3 -c "from opentelemetry import trace; print('OTel import successful!')"
 
       - name: Configure SSH & Vault Keys
