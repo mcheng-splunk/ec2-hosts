@@ -28,14 +28,12 @@ on:
           - db_machines
           - webservers
           - ALL
-# ... (Keep your top 'name:' and 'on:' blocks exactly the same) ...
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   deploy:
-    # This exact array block overrides the engine, matching ubuntu-latest 
-    # but executing directly on the runner pod's shell.
     runs-on: ubuntu-latest
 
     steps:
@@ -89,42 +87,50 @@ jobs:
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass.txt
           chmod 600 .vault_pass.txt
 
-      # NOTE: Folder-based detection approach (alternative to dropdown selection)
-      # Uncomment the block below to enable automatic environment detection based on
-      # which folder (dev/test/prod) was modified in the git push.
-      # When enabled, this will override the dropdown inputs from workflow_dispatch.
-      #
-      # ================== START OF FOLDER DETECTION CODE (COMMENTED) ==================
-      # - name: Parse Environment via Folder Detection (Alternative Method)
+      # =================================================================
+      # FOLDER DETECTION APPROACH (Alternative to dropdown selection)
+      # Uncomment this block to enable automatic environment detection
+      # based on which folder (dev/test/prod) was modified in the git push.
+      # =================================================================
+      # - name: Parse Environment via Folder Detection
       #   id: parse-matrix
       #   run: |
-      #     # Detect which environment folder was modified by checking git diff
-      #     # This requires checkout first, then checking what changed
-      #     # CHANGED_FILES=$(git diff HEAD~1 --name-only | grep -E "inventories/(dev|test|prod)" | head -1)
+      #     # Get the list of changed files from the push event
+      #     echo "Fetching changed files..."
+      #     curl -s https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }} | jq -r '.files[].filename' > /tmp/changed_files.txt 2>/dev/null || echo "" > /tmp/changed_files.txt
       #
       #     ENV_CHOICE="dev"  # default
-      #     if grep -r "inventories/test" . 2>/dev/null | grep -q "changed"; then
+      #     if grep -q "inventories/test" /tmp/changed_files.txt 2>/dev/null; then
       #       ENV_CHOICE="test"
-      #     elif grep -r "inventories/prod" . 2>/dev/null | grep -q "changed"; then
+      #       echo "Detected environment: test (from folder detection)"
+      #     elif grep -q "inventories/prod" /tmp/changed_files.txt 2>/dev/null; then
       #       ENV_CHOICE="prod"
-      #     elif grep -r "inventories/dev" . 2>/dev/null | grep -q "changed"; then
+      #       echo "Detected environment: prod (from folder detection)"
+      #     elif grep -q "inventories/dev" /tmp/changed_files.txt 2>/dev/null; then
       #       ENV_CHOICE="dev"
+      #       echo "Detected environment: dev (from folder detection)"
+      #     else
+      #       echo "No environment folder changes detected, defaulting to dev"
       #     fi
       #
       #     # Detect tier based on playbook file changes
       #     TIER_CHOICE="db_machines"  # default
-      #     if git diff HEAD~1 --name-only | grep -q "webservers.yml"; then
+      #     if grep -q "webservers.yml" /tmp/changed_files.txt 2>/dev/null; then
       #       TIER_CHOICE="webservers"
-      #     elif git diff HEAD~1 --name-only | grep -q "site.yml"; then
+      #     elif grep -q "site.yml" /tmp/changed_files.txt 2>/dev/null; then
       #       TIER_CHOICE="ALL"
       #     fi
       #
-      #     echo "Detected environment: $ENV_CHOICE (folder detection)"
-      # ================== END OF FOLDER DETECTION CODE (COMMENTED) ==================
+      #     echo "inventory_path=inventories/$ENV_CHOICE/" >> $GITHUB_OUTPUT
+      #     echo "playbook_file=$TIER_CHOICE.yml" >> $GITHUB_OUTPUT
 
-      # ================== START OF DROPDOWN SELECTION CODE (ACTIVE) ==================
-      # Keep this block active for manual environment selection
-      # ================== END OF DROPDOWN SELECTION CODE (ACTIVE) ==================
+      # =================================================================
+      # DROPDOWN SELECTION APPROACH (Default - Active)
+      # Keep this block active for manual environment selection via workflow_dispatch
+      # =================================================================
+      - name: Parse Environment and Playbook Selections
+        id: parse-matrix
+        run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ENV_CHOICE="${{ github.event.inputs.target_env }}"
             TIER_CHOICE="${{ github.event.inputs.target_tier }}"
@@ -149,6 +155,4 @@ jobs:
         run: |
           ansible-playbook -i ${{ steps.parse-matrix.outputs.inventory_path }} ${{ steps.parse-matrix.outputs.playbook_file }} --vault-password-file .vault_pass.txt
         env:
-          # This tells Ansible to skip host key checking globally during this execution step,
-          # completely bypassing the need to touch or modify your ansible.cfg file.
           ANSIBLE_HOST_KEY_CHECKING: "False"
